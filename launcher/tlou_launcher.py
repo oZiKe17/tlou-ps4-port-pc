@@ -13,10 +13,12 @@ import queue
 import shutil
 import subprocess
 import sys
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox
 import threading
 from pathlib import Path
 
-PORT = Path(__file__).resolve().parent.parent
+PORT = Path(__file__).resolve().parent.parent / "port"
 sys.path.insert(0, str(PORT))
 try:
     import run as tlg_run
