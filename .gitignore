@@ -1,0 +1,28 @@
+# Runtime artifacts
+port/out/
+port/pgo/
+port/user/
+logs/
+*.log
+
+# Shader cache
+port/out/gpu/cache/
+port/out/gpu/*.spv
+
+# Build artifacts
+port/out/gpu/
+port/out/*.o
+port/out/*.a
+port/out/*.so
+port/out/tlg-probe
+port/out/tlg-gpu-capabilities
+
+# Submodules (cloned separately)
+port/gpu/third_party/fsr-vulkan/
+port/gpu/third_party/imgui/
+port/gpu/third_party/magic_enum/
+port/gpu/third_party/miniz/
+port/gpu/third_party/robin-map/
+port/gpu/third_party/vulkan-headers/
+port/gpu/third_party/xbyak/
+port/third_party/LibAtrac9/
