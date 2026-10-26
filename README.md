@@ -43,9 +43,8 @@ nativo mediante MSYS2 CLANG64. El código fuente y sus licencias se distribuyen 
 - Los parches de 60 FPS y resolución para 1.00/1.11 requieren reverse engineering del eboot (no incluidos).
 - FSR 4 requiere GPU con INT8 dot products; fallback a FSR 3.1.
 - Hot pages desactivado por defecto (regresión de FPS observada).
-- El AppImage usa ~/.local/share/tlou-pc como directorio de datos escribible.
 
-## Próximos pasos
+## FALTAN MUCHAS COSAS POR PULIR 
 
 1. Sincronizar `port/gpu/` desde `ps4_core`/`tlg_pc` (submódulos third_party).
 2. Promover a `ps4_core` las funciones borrowables genéricas (jpeg/png/fiber/socket).
