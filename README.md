@@ -3,6 +3,8 @@
 Port nativo de *The Last of Us™ Remastered* (CUSA00552, v1.00) para PC/Linux,
 siguiendo el mismo patrón que `tlg_pc` / `gr2_pc` / `iss_pc`:
 
+NO SE PROPORCIONA NINGUN ARCHIVO O ASSETS DEL JUEGO ORIGINAL
+
 - `ps4_core` como núcleo compartido (compatibilidad PS4→host).
 - `port/scripts/prepare.py` extrae imports del SELF y genera `out/boot.bin` + `out/analysis.json`.
 - `port/scripts/link_modules.py` vincula `libc.prx`/`libSceFios2.prx` → `out/link.json` (imports no resueltos).
