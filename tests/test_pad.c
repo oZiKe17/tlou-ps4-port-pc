@@ -18,7 +18,10 @@ void tlggpu_mouse_take(TlgGpuMouse *m) {
     test_mouse.dx=test_mouse.dy=0; test_mouse.pressed=0;
     test_mouse.wheel_up=test_mouse.wheel_down=test_mouse.wheel_left=test_mouse.wheel_right=0;
 }
-static TlgGpuInputSettings test_input={1,0,1.0f,0.0f,0.0f,0.1f,""};
+static TlgGpuInputSettings test_input={
+    .mouse_enabled=1, .invert_y=0, .rumble=1, .sensitivity=1.0f,
+    .smoothing=0.0f, .accel=0.0f, .deadzone=0.1f, .key_map=""
+};
 void tlggpu_input_settings(TlgGpuInputSettings *s) { *s=test_input; }
 uintptr_t runtime_lookup(const RuntimeExport *table, size_t count, const char *name) {
     (void)table; (void)count; (void)name;
@@ -259,7 +262,31 @@ int main(void) {
     data=read_pad();
     assert(data.right_x==128 && !(data.buttons & BTN_TRIANGLE));
     test_mouse.held=0;
+    /* The launcher switch enables stick/button-to-motion translation without consuming input. */
+    PadData motion_data={0};
+    setenv("TLG_AUTO_GYRO","1",1);
+    motion.mode_init=0; motion.mode=0; motion.auto_enabled=0;
+    sample_motion(&motion_data,NULL,NULL);
+    assert(motion.auto_enabled && !motion.mode);
+    setenv("TLG_AUTO_GYRO","0",1);
+    motion.mode_init=0; motion.mode=0; motion.auto_enabled=1;
+    sample_motion(&motion_data,NULL,NULL);
+    assert(!motion.auto_enabled && !motion.mode);
+    const char *locales[]={"es","pt","en","fr"};
+    const char *sensor_on[]={"Sensor activado: stick izq. inclina, X/A sacude",
+                             "Sensor ligado: analógico esquerdo inclina, X/A sacode",
+                             "Sensor mode on: left stick tilts, X/A shakes",
+                             "Capteur activé : stick gauche incline, X/A secoue"};
+    const char *touchpad_on[]={"Mouse: modo touchpad activo (izq. toca, arrastrar desliza, der. = dos dedos)",
+                               "Mouse: modo touchpad ativo (esq. toca, arrastar desliza, dir. = dois dedos)",
+                               "Mouse: touchpad mode on (left touches, drag swipes, right = two fingers)",
+                               "Souris : mode pavé tactile actif (gauche touche, glisser balaie, droite = deux doigts)"};
+    for (size_t i=0;i<sizeof(locales)/sizeof(locales[0]);++i) {
+        setenv("TLG_UI_LANG",locales[i],1);
+        assert(!strcmp(sensor_mode_notice(1),sensor_on[i]));
+        assert(!strcmp(touchpad_mode_notice(1),touchpad_on[i]));
+    }
     SDL_Quit();
     unlink(path);
-    puts("PASS: pad ABI, staged left/right clicks, L1 chord, SDL touch coordinates, overlay capture, mouse");
+    puts("PASS: pad ABI, motion-assist switch, staged clicks, touch, overlay, and mouse");
 }

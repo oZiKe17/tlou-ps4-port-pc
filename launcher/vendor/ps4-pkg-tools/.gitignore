@@ -1,0 +1,89 @@
+# Build directories
+/build/
+/out/
+/cmake-build*/
+/Debug/
+/Release/
+/x64/
+/x86/
+/mac-build/
+/linux-build/
+/windows-build/
+
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+/ps4-pkg-tool
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+compile_commands.json
+/install_manifest.txt
+
+# IDE files
+/.vs/
+/.vscode/
+/.idea/
+*.swp
+*.swo
+.clangd/
+.cache/
+
+# macOS specific
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Package/dependency files
+/vcpkg_installed/
+/_deps/
+
+# Generated files
+/src/common/scm_rev.cpp
+
+# Testing
+/Testing/
+/Google*
+*.log
+
+# Artifacts
+*.pkg
+/extract/

@@ -19,6 +19,9 @@ data=${TLG_DATA_DIR:-.}
 out=$data/out
 mkdir -p "$out"
 export TLG_CONFIG=${TLG_CONFIG:-$data/tlg.ini}
+if [[ -z ${TLG_WINDOW_ICON:-} && -f ../launcher/assets/tlou_guitar_icon.bmp ]]; then
+    export TLG_WINDOW_ICON="$PWD/../launcher/assets/tlou_guitar_icon.bmp"
+fi
 # FSR 4.1.1 assets (tools/fsr4cap/build_assets.sh): next to run.sh or in the data directory.
 if [[ -z ${TLG_FSR411_DIR:-} && ! -d fsr4_411 && -d $data/fsr4_411 ]]; then
     export TLG_FSR411_DIR=$data/fsr4_411
@@ -37,7 +40,7 @@ if [[ -z ${PYTHON:-} ]]; then
 fi
 if [[ -z ${PYTHON:-} ]]; then echo 'Install Python 3 or set PYTHON.' >&2; exit 1; fi
 # TLG_GAME_DIR: the game's folder (eboot.bin, sce_module, ...); default next to this directory.
-game=${TLG_GAME_DIR:-../CUSA01623}
+game=${TLG_GAME_DIR:-../CUSA00552}
 if [[ ! -f $game/eboot.bin ]]; then echo "No eboot.bin in $game (set TLG_GAME_DIR)." >&2; exit 1; fi
 original_game=$game
 game=$("$PYTHON" scripts/mods.py "$game" --out "$out" \

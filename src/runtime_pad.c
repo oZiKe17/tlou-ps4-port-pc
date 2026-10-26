@@ -43,6 +43,46 @@ enum {
     CLICK_LEFT=0x40000000, CLICK_RIGHT=0x80000000,
 };
 typedef struct { uint16_t x, y; uint8_t id, reserve[3]; } PadTouch;
+
+enum { UI_LANG_ES, UI_LANG_PT, UI_LANG_EN, UI_LANG_FR };
+
+static int launcher_ui_language(void) {
+    const char *lang=getenv("TLG_UI_LANG");
+    if (!lang || !*lang) lang=getenv("LC_MESSAGES");
+    if (!lang || !*lang) lang=getenv("LANG");
+    if (lang && !strncmp(lang,"pt",2)) return UI_LANG_PT;
+    if (lang && !strncmp(lang,"en",2)) return UI_LANG_EN;
+    if (lang && !strncmp(lang,"fr",2)) return UI_LANG_FR;
+    return UI_LANG_ES;
+}
+
+static const char *sensor_mode_notice(int enabled) {
+    static const char *const on[]={
+        "Sensor activado: stick izq. inclina, X/A sacude",
+        "Sensor ligado: analógico esquerdo inclina, X/A sacode",
+        "Sensor mode on: left stick tilts, X/A shakes",
+        "Capteur activé : stick gauche incline, X/A secoue"
+    };
+    static const char *const off[]={
+        "Modo sensor desactivado", "Modo sensor desligado", "Sensor mode off", "Mode capteur désactivé"
+    };
+    const int lang=launcher_ui_language();
+    return enabled ? on[lang] : off[lang];
+}
+
+static const char *touchpad_mode_notice(int enabled) {
+    static const char *const on[]={
+        "Mouse: modo touchpad activo (izq. toca, arrastrar desliza, der. = dos dedos)",
+        "Mouse: modo touchpad ativo (esq. toca, arrastar desliza, dir. = dois dedos)",
+        "Mouse: touchpad mode on (left touches, drag swipes, right = two fingers)",
+        "Souris : mode pavé tactile actif (gauche touche, glisser balaie, droite = deux doigts)"
+    };
+    static const char *const off[]={
+        "Mouse: cámara", "Mouse: câmera", "Mouse: camera", "Souris : caméra"
+    };
+    const int lang=launcher_ui_language();
+    return enabled ? on[lang] : off[lang];
+}
 typedef struct {
     uint32_t buttons;
     uint8_t left_x, left_y, right_x, right_y;
@@ -311,7 +351,7 @@ static void load_button_maps(void) {
  * TLG_MOTION=off disables real sensors (simulation still works). */
 static int injected_motion; /* TLG_PAD_FILE tokens: 1 tilt_right (T), 2 tilt_left (G), 4 shake (Y) */
 typedef struct { float w, x, y, z; } Quat;
-static struct { Quat q; float roll, pitch; uint64_t last_us; int sensors, warned, mode, toggle_held; } motion={{1,0,0,0},0,0,0,-1,0,0,0};
+static struct { Quat q; float roll, pitch; uint64_t last_us; int sensors, warned, mode, toggle_held, mode_init, auto_enabled; } motion={{1,0,0,0},0,0,0,-1,0,0,0,0,0};
 static Quat quat_mul(Quat a, Quat b) {
     return (Quat){a.w*b.w-a.x*b.x-a.y*b.y-a.z*b.z, a.w*b.x+a.x*b.w+a.y*b.z-a.z*b.y,
                   a.w*b.y-a.x*b.z+a.y*b.w+a.z*b.x, a.w*b.z+a.x*b.y-a.y*b.x+a.z*b.w};
@@ -339,6 +379,12 @@ static void sample_motion(PadData *d, SDL_Gamepad *g, const bool *k) {
     float dt=motion.last_us ? (float)(now-motion.last_us)*1e-6f : 0.f;
     if (dt>0.1f) dt=0.1f;
     motion.last_us=now;
+    if (!motion.mode_init) {
+        const char *automatic=getenv("TLG_AUTO_GYRO");
+        motion.auto_enabled=automatic && (!strcmp(automatic,"1") || !strcmp(automatic,"true") || !strcmp(automatic,"on"));
+        motion.mode_init=1;
+        if (motion.auto_enabled) puts("Runtime: controller-to-motion assist enabled by launcher");
+    }
     if (motion.sensors<0) { const char *e=getenv("TLG_MOTION"); motion.sensors=!(e && !strcmp(e,"off")); }
     /* Real sensors. */
     float gyro[3]={0,0,0}, accel[3]={0,0,0};
@@ -362,11 +408,7 @@ static void sample_motion(PadData *d, SDL_Gamepad *g, const bool *k) {
         const int toggle=sticks || (motion_button()>=0 && SDL_GetGamepadButton(g,(SDL_GamepadButton)motion_button()));
         if (toggle && !motion.toggle_held) {
             motion.mode=!motion.mode;
-            const char *lang=getenv("TLG_UI_LANG");
-            const int pt=!(lang && !strncmp(lang,"en",2));
-            tlggpu_overlay_notice(motion.mode ? (pt ? "Modo sensor LIGADO: analógico esquerdo inclina, X/A sacode"
-                                                    : "Sensor mode ON: left stick tilts, cross/A shakes")
-                                              : (pt ? "Modo sensor desligado" : "Sensor mode off"), 3.0f);
+            tlggpu_overlay_notice(sensor_mode_notice(motion.mode),3.0f);
             printf("Runtime: sensor mode %s\n",motion.mode ? "on" : "off");
         }
         motion.toggle_held=toggle;
@@ -378,6 +420,13 @@ static void sample_motion(PadData *d, SDL_Gamepad *g, const bool *k) {
             d->buttons&=~(uint32_t)BTN_CROSS;
             d->left_x=d->left_y=128;
             simulated=1;
+        } else if (motion.auto_enabled) {
+            /* Reuse ordinary stick/button input as sensor data without consuming gameplay input. */
+            const float x=(float)SDL_GetGamepadAxis(g,SDL_GAMEPAD_AXIS_LEFTX)/32767.f;
+            const float y=(float)SDL_GetGamepadAxis(g,SDL_GAMEPAD_AXIS_LEFTY)/32767.f;
+            if (!simulated) { roll=x*1.2f; pitch=y*1.2f; }
+            if (SDL_GetGamepadButton(g,SDL_GAMEPAD_BUTTON_SOUTH)) shake=1;
+            simulated=simulated || fabsf(x)>0.08f || fabsf(y)>0.08f || shake;
         }
     }
     if (real && !simulated) {
@@ -529,11 +578,7 @@ static uint32_t sample_mouse(PadData *d, const bool *k) {
         if (pad_mode_cfg.toggle) {
             if (key_down && !key_was_down) {
                 toggled=!toggled;
-                const char *lang=getenv("TLG_UI_LANG");
-                const int pt=!(lang && !strncmp(lang,"en",2));
-                tlggpu_overlay_notice(toggled ? (pt ? "Mouse: modo touchpad LIGADO (esquerdo toca, arrastar desliza, direito = dois dedos)"
-                                                    : "Mouse: touchpad mode ON (left touches, drag swipes, right = two fingers)")
-                                              : (pt ? "Mouse: câmera" : "Mouse: camera"), 2.5f);
+                tlggpu_overlay_notice(touchpad_mode_notice(toggled),2.5f);
             }
             pad_mode=toggled;
         } else pad_mode=key_down;

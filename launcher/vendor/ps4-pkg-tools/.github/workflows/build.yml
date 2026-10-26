@@ -1,0 +1,64 @@
+name: Build (CLI + GUI)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake qt6-base-dev
+          gcc --version || true
+          cmake --version
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install cmake qt@6 || true
+          cmake --version
+
+      - name: Build (Release)
+        run: |
+          make release
+
+      - name: List build outputs
+        run: |
+          ls -alh build || true
+          file build/ps4-pkg-tool || true
+          if [ -f build/ps4-pkg-tool-gui ]; then file build/ps4-pkg-tool-gui; fi
+
+      - name: Package artifacts
+        run: |
+          mkdir -p artifact
+          cp build/ps4-pkg-tool artifact/ || true
+            # GUI may be optional if Qt not found
+          if [ -f build/ps4-pkg-tool-gui ]; then cp build/ps4-pkg-tool-gui artifact/; fi
+          cd artifact
+          tar -czf ../ps4-pkg-tools-${{ runner.os }}.tar.gz *
+          cd ..
+          ls -alh ps4-pkg-tools-${{ runner.os }}.tar.gz
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ps4-pkg-tools-${{ runner.os }}
+          path: ps4-pkg-tools-${{ runner.os }}.tar.gz

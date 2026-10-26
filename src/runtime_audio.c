@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <pthread.h>
 #include <time.h>
 #include <SDL3/SDL.h>
@@ -32,6 +33,7 @@
 typedef struct {
     int used, type, channels, is_float, frames, sample_bytes, std_layout, downmix;
     int32_t volume[8];
+    SDL_AudioDeviceID device_id;
     SDL_AudioStream *stream;
     uint64_t next_deadline_ns; /* next return of sceAudioOutOutput */
     int64_t adjust_ns; int window_min, window_count; /* queue level control */
@@ -49,6 +51,65 @@ static pthread_mutex_t table_lock=PTHREAD_MUTEX_INITIALIZER;
 static Port ports[PORTS];
 static int initialized, sdl_ready=-1;
 static size_t buffers_out, ports_opened;
+static float game_gain=1.0f;
+static pthread_once_t gain_once=PTHREAD_ONCE_INIT;
+static int audio_device_resolved;
+static SDL_AudioDeviceID audio_device_choice;
+
+static int contains_nocase(const char *text, const char *needle) {
+    if (!text || !needle || !*needle) return 0;
+    for (; *text; ++text) {
+        const char *a=text, *b=needle;
+        while (*a && *b && tolower((unsigned char)*a)==tolower((unsigned char)*b)) { ++a; ++b; }
+        if (!*b) return 1;
+    }
+    return 0;
+}
+
+static SDL_AudioDeviceID selected_audio_device(void) {
+    if (audio_device_resolved) return audio_device_choice;
+    const char *requested=getenv("TLG_AUDIO_DEVICE");
+    if (!requested || !*requested || !strcmp(requested,"default") || !strcmp(requested,"Detectar automáticamente")) {
+        audio_device_choice=SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK;
+        audio_device_resolved=1;
+        return audio_device_choice;
+    }
+    int count=0;
+    SDL_AudioDeviceID *devices=SDL_GetAudioPlaybackDevices(&count);
+    SDL_AudioDeviceID selected=SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK;
+    for (int i=0; devices && i<count; ++i) {
+        const char *name=SDL_GetAudioDeviceName(devices[i]);
+        if (name && (contains_nocase(name,requested) || contains_nocase(requested,name))) {
+            selected=devices[i];
+            printf("Runtime: audio output selected: %s\n",name);
+            break;
+        }
+    }
+    if (selected==SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK)
+        fprintf(stderr,"Runtime: audio device '%s' was not found by SDL; using the system default\n",requested);
+    if (devices) SDL_free(devices);
+    audio_device_choice=selected;
+    audio_device_resolved=1;
+    return audio_device_choice;
+}
+
+static void initialize_audio_gain(void) {
+    const char *value=getenv("TLG_AUDIO_VOLUME");
+    if (value && *value) {
+        char *end=NULL;
+        float percent=strtof(value,&end);
+        if (end!=value) {
+            if (percent<0.f) percent=0.f;
+            if (percent>100.f) percent=100.f;
+            game_gain=percent/100.f;
+        }
+    }
+}
+
+static float requested_audio_gain(void) {
+    pthread_once(&gain_once,initialize_audio_gain);
+    return game_gain;
+}
 
 static uint64_t now_ns(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC,&t); return (uint64_t)t.tv_sec*1000000000u+(uint64_t)t.tv_nsec; }
 static void sleep_until(uint64_t deadline) {
@@ -137,11 +198,12 @@ static int32_t open_port(int32_t type, uint32_t length, uint32_t freq, uint32_t 
     p->sample_bytes=p->is_float ? 4 : 2; p->frames=(int)length; p->std_layout=format>=6;
     for (int c=0;c<8;++c) p->volume[c]=VOLUME_0DB;
     if (sdl_audio()) {
+        p->device_id=selected_audio_device();
         SDL_AudioSpec device; int device_frames;
-        p->downmix=p->channels==8 && SDL_GetAudioDeviceFormat(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,&device,&device_frames)
+        p->downmix=p->channels==8 && SDL_GetAudioDeviceFormat(p->device_id,&device,&device_frames)
                    && device.channels==2;
         SDL_AudioSpec spec={p->is_float ? SDL_AUDIO_F32 : SDL_AUDIO_S16, p->downmix ? 2 : p->channels, 48000};
-        p->stream=SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,&spec,NULL,NULL);
+        p->stream=SDL_OpenAudioDeviceStream(p->device_id,&spec,NULL,NULL);
         if (p->stream) SDL_ResumeAudioStreamDevice(p->stream);
         else fprintf(stderr,"Runtime: SDL audio stream failed (%s); port %d uses the timer sink\n",SDL_GetError(),id);
     }
@@ -196,7 +258,7 @@ static int32_t output_port(int32_t handle, const void *data, int pace) {
         for (size_t f=0;f<(size_t)p->frames;++f) for (int c=0;c<p->channels;++c) {
             int target=p->channels==8 && !p->std_layout ? remap[c] : c;
             size_t from=f*(size_t)p->channels+(size_t)c, to=f*(size_t)p->channels+(size_t)target;
-            float gain=(float)p->volume[c]/VOLUME_0DB;
+            float gain=(float)p->volume[c]/VOLUME_0DB*requested_audio_gain();
             if (p->is_float) { float v; memcpy(&v,(const char *)data+from*4,4); v*=gain; memcpy(converted+to*4,&v,4); }
             else { int16_t v; memcpy(&v,(const char *)data+from*2,2); v=(int16_t)((float)v*gain); memcpy(converted+to*2,&v,2); }
         }

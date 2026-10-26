@@ -10,6 +10,11 @@ int64_t runtime_file_open(const char *path, int flags, int mode) { (void)path; (
 int64_t runtime_file_read(int fd, void *buffer, uint64_t size) { (void)fd; (void)buffer; (void)size; return -1; }
 int64_t runtime_file_close(int fd) { (void)fd; return 0; }
 static int choice_next=-1, message_next=-1, message_code=0, progress_shown=0, toasts=0;
+#ifdef _WIN32
+static void test_env(const char *name,const char *value) { _putenv_s(name,value ? value : ""); }
+#else
+static void test_env(const char *name,const char *value) { if (value) setenv(name,value,1); else unsetenv(name); }
+#endif
 int tlggpu_save_list_begin(int kind, const TlgSaveEntry *entries, int count, int focus) { (void)kind; (void)entries; (void)focus; return count>0; }
 int tlggpu_save_list_poll(void) { return choice_next; }
 int tlggpu_save_message_begin(int kind, int code, uint64_t value, const char *text, int buttons, const TlgSaveEntry *entry) {
@@ -26,6 +31,26 @@ uint64_t runtime_savedata_size(int32_t user, const char *dir) { (void)user; (voi
 int main(void) {
     unsigned char param[128]={0}, result[64]={0}; /* the game zeroes the pointers it does not want */
     uint32_t value;
+    int32_t system_language=-1;
+
+    /* Launcher and headless defaults are Spanish (Latin America); an explicit PS4 ID wins. */
+    test_env("TLG_LANGUAGE",NULL);
+    assert(system_param(1,&system_language)==0 && system_language==20);
+    test_env("TLG_LANGUAGE","3");
+    assert(system_param(1,&system_language)==0 && system_language==3);
+    test_env("TLG_LANGUAGE","invalid");
+    assert(system_param(1,&system_language)==0 && system_language==20);
+    test_env("TLG_LANGUAGE",NULL);
+    int32_t language_id=-1;
+
+    /* The launcher/port default is Spanish (Latin America); the selected PS4 language ID wins. */
+    test_env("TLG_LANGUAGE",NULL);
+    assert(system_param(1,&language_id)==0 && language_id==20);
+    test_env("TLG_LANGUAGE","3");
+    assert(system_param(1,&language_id)==0 && language_id==3);
+    test_env("TLG_LANGUAGE","invalid");
+    assert(system_param(1,&language_id)==0 && language_id==20);
+    test_env("TLG_LANGUAGE",NULL);
 
     /* MsgDialog: a user message finishes with OK; a progress bar runs until closed. */
     assert(msg_init()==0);

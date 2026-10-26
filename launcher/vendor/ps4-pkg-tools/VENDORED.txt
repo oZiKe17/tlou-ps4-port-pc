@@ -1,0 +1,9 @@
+Upstream: https://github.com/xXJSONDeruloXx/ps4-pkg-tools
+Upstream revision: 45baedaa29b8da42b3c6fe912800d2fa4119834b
+License: GPL-2.0-or-later; see LICENSE and LICENSES/.
+
+The CLI is used for extracting user-selected PKG files. The build is trimmed
+to the CLI target and its required Crypto++/zlib dependencies. Local Windows
+compatibility adjustments: src/common/io_file.cpp uses CreateFileMappingW,
+available in MinGW and Windows SDKs, and the CMake target links ntdll for
+NtSetInformationFile.

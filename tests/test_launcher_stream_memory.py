@@ -1,126 +1,113 @@
-"""Saved launcher selection, legacy settings and both launch paths for stream memory."""
-import json
-import os
-from pathlib import Path
+"""The TLOU launcher keeps worker and staging defaults portable across hosts."""
 import sys
-import tempfile
+import tkinter as tk
 import unittest
-from unittest import mock
+from pathlib import Path
 
 from paths import ROOT
-sys.path.insert(0, str(ROOT / 'launcher'))
-import tlg_launcher_win as launcher  # noqa: E402
+sys.path.insert(0, str(ROOT.parent / "launcher"))
+import tlou_launcher as launcher  # noqa: E402
 
 
-class StreamMemoryEnvironmentTest(unittest.TestCase):
-    def test_legacy_settings_and_invalid_values_use_cached_memory(self):
-        legacy = dict(launcher.APP_DEFAULTS)
-        legacy.pop('stream_memory')
-        with mock.patch.dict(os.environ, {'TLG_STREAM_MEMORY': 'device'}):
-            self.assertEqual(launcher.game_environment(legacy)['TLG_STREAM_MEMORY'], 'cached')
-            for value in ('', 'invalid', None, [], 1):
-                with self.subTest(value=value):
-                    env = launcher.game_environment({**legacy, 'stream_memory': value})
-                    self.assertEqual(env['TLG_STREAM_MEMORY'], 'cached')
-
-    def test_every_selection_overrides_inherited_environment_without_changing_it(self):
-        with mock.patch.dict(os.environ, {'TLG_STREAM_MEMORY': 'host'}):
-            for value in ('cached', 'host', 'device'):
-                with self.subTest(value=value):
-                    env = launcher.game_environment({**launcher.APP_DEFAULTS, 'stream_memory': value})
-                    self.assertEqual(env['TLG_STREAM_MEMORY'], value)
-                    self.assertEqual(os.environ['TLG_STREAM_MEMORY'], 'host')
-
-    def test_play_without_window_uses_saved_selection(self):
-        with tempfile.TemporaryDirectory() as folder:
-            settings_path = Path(folder) / 'settings.json'
-            for value in ('cached', 'host', 'device'):
-                with self.subTest(value=value):
-                    settings_path.write_text(json.dumps({'stream_memory': value}), encoding='utf-8')
-                    settings = {**launcher.APP_DEFAULTS, **launcher.load_json(settings_path, {}),
-                                'user_dir': folder}
-                    process = mock.Mock()
-                    process.stdout.readline.return_value = b''
-                    process.wait.return_value = 0
-                    with mock.patch.object(launcher, 'attach_stdio'), \
-                            mock.patch.object(launcher.subprocess, 'Popen', return_value=process) as start:
-                        self.assertEqual(launcher.play_without_window(settings), 0)
-                    self.assertEqual(start.call_args.kwargs['env']['TLG_STREAM_MEMORY'], value)
+def make_settings_app():
+    interp = tk.Tcl()
+    app = launcher.Launcher.__new__(launcher.Launcher)
+    app.settings = launcher.DEFAULTS.copy()
+    app.vars = {
+        key: tk.StringVar(master=interp, value=str(value))
+        for key, value in launcher.DEFAULTS.items() if not isinstance(value, bool)
+    }
+    app.bools = {
+        key: tk.BooleanVar(master=interp, value=value)
+        for key, value in launcher.DEFAULTS.items() if isinstance(value, bool)
+    }
+    app.switch_vars = {
+        key: tk.BooleanVar(master=interp, value=str(value) in {"1", "true", "yes", "on"})
+        for key, value in launcher.DEFAULTS.items() if key in launcher.SWITCH_KEYS
+    }
+    return app
 
 
-class StreamMemoryLauncherTest(unittest.TestCase):
-    def test_ui_selection_persists_reopens_and_reverts_on_next_launch(self):
-        # Exercise the real Tk combobox event and collect/play methods using temporary settings.
-        # The process is mocked so this never opens or changes a game installation.
-        try:
-            import tkinter as tk
-            from tkinter import ttk
-            root = tk.Tk()
-        except ImportError as error:
-            self.skipTest(f'Tk unavailable: {error}')
-        except tk.TclError as error:
-            self.skipTest(f'Tk display unavailable: {error}')
-        root.withdraw()
-        self.addCleanup(root.destroy)
-        with tempfile.TemporaryDirectory() as folder, \
-                mock.patch.object(launcher, 'CONFIG_DIR', Path(folder)), \
-                mock.patch.object(launcher, 'CONFIG_FILE', Path(folder) / 'settings.json'), \
-                mock.patch.dict(os.environ, {'TLG_CONFIG': str(Path(folder) / 'tlg.ini')}):
-            app = launcher.Launcher.__new__(launcher.Launcher)
-            app.tk, app.ttk, app.root, app.dpi = tk, ttk, root, 1.0
-            app.content, app.pages, app.vars = ttk.Frame(root), {}, {}
-            app.app = dict(launcher.APP_DEFAULTS)
-            app.ini, app.ini_lines = launcher.load_ini()
-            app.control_vars, app.mod_order, app.patch_vars = {}, [], {}
-            app.pad_style = tk.StringVar(root, value='playstation')
-            app.store_game_patches = mock.Mock()
-            app.build_performance()
+class LauncherPortableSizingTest(unittest.TestCase):
+    def test_motion_help_and_language_selectors_cover_only_launcher_locales(self):
+        locales = {"es", "pt", "en", "fr"}
+        self.assertEqual(set(launcher.MOTION_HELP_TEXT), locales)
+        self.assertEqual(set(launcher.LAUNCHER_LANGUAGE_CODES.values()), locales)
+        self.assertEqual(len(launcher.LANGUAGE_PRESETS), 4)
+        for text in launcher.MOTION_HELP_TEXT.values():
+            self.assertTrue(text["link"])
+            self.assertTrue(text["stick"])
+            self.assertTrue(text["shake"])
+            self.assertTrue(text["note"])
 
-            def widgets(parent):
-                for child in parent.winfo_children():
-                    yield child
-                    yield from widgets(child)
+    def test_defaults_delegate_thread_and_staging_sizing_to_runtime(self):
+        settings = make_settings_app()._collect_settings()
+        self.assertEqual(settings["copy_threads"], "auto")
+        self.assertEqual(settings["staging_keep"], "auto")
+        self.assertEqual(settings["phys_cores"], "0")
+        self.assertEqual(settings["hot_pages"], "0")
 
-            labels = tuple(launcher._(*text) for _value, text in launcher.STREAM_MEMORY)
-            boxes = [widget for widget in widgets(app.pages['performance'])
-                     if isinstance(widget, ttk.Combobox) and tuple(widget['values']) == labels]
-            self.assertEqual(len(boxes), 1)
-            box = boxes[0]
-            self.assertEqual(app.vars['stream_memory'].get(), 'cached')
+    def test_explicit_valid_overrides_are_preserved(self):
+        app = make_settings_app()
+        app.vars["copy_threads"].set("3")
+        app.vars["staging_keep"].set("384")
+        app.switch_vars["phys_cores"].set(True)
+        settings = app._collect_settings()
+        self.assertEqual(settings["copy_threads"], "3")
+        self.assertEqual(settings["staging_keep"], "384")
+        self.assertEqual(settings["phys_cores"], "1")
 
-            for index, (value, _text) in enumerate(launcher.STREAM_MEMORY):
-                with self.subTest(value=value):
-                    box.current(index)
-                    box.event_generate('<<ComboboxSelected>>')
-                    self.assertEqual(app.vars['stream_memory'].get(), value)
-                    app.collect()
-                    saved = {**launcher.APP_DEFAULTS, **launcher.load_json(launcher.CONFIG_FILE, {})}
-                    self.assertEqual(saved['stream_memory'], value)
-                    reopened = launcher.Launcher.__new__(launcher.Launcher)
-                    reopened.tk, reopened.ttk, reopened.app, reopened.vars = tk, ttk, saved, {}
-                    holder = ttk.Frame(root)
-                    reopened_box = reopened.choice(holder, 'stream_memory', 'app', launcher.STREAM_MEMORY)
-                    self.assertEqual(reopened_box.current(), index)
-                    holder.destroy()
+    def test_boolean_advanced_values_are_collected_from_switch_state(self):
+        app = make_settings_app()
+        app.switch_vars["async_shaders"].set(True)
+        app.switch_vars["hot_pages"].set(False)
+        settings = app._collect_settings()
+        self.assertEqual(settings["async_shaders"], "1")
+        self.assertEqual(settings["hot_pages"], "0")
 
-                    app.process = None
-                    app.play_button, app.status = mock.Mock(), mock.Mock()
-                    process = mock.Mock()
-                    with mock.patch.object(launcher, 'game_info', return_value=('God of War III', '01.02')), \
-                            mock.patch.object(launcher, 'missing_game_files', return_value=[]), \
-                            mock.patch.object(launcher.subprocess, 'Popen', return_value=process) as start, \
-                            mock.patch.object(launcher, 'GameJob'), \
-                            mock.patch.object(launcher.threading, 'Thread'), \
-                            mock.patch.object(app, 'set_log', create=True):
-                        app.play()
-                    self.assertEqual(start.call_args.kwargs['env']['TLG_STREAM_MEMORY'], value)
-            # Selecting cached again after device restores the optimization on the next launch.
-            box.current(0)
-            box.event_generate('<<ComboboxSelected>>')
-            app.collect()
-            self.assertEqual(launcher.load_json(launcher.CONFIG_FILE, {})['stream_memory'], 'cached')
-            app.content.destroy()
+    def test_boolean_core_mode_is_serialized_as_a_switch(self):
+        app = make_settings_app()
+        app.switch_vars["phys_cores"].set(True)
+        app.vars["copy_threads"].set("auto")
+        app.vars["staging_keep"].set("auto")
+        settings = app._collect_settings()
+        self.assertEqual(settings["phys_cores"], "1")
+        self.assertEqual(settings["copy_threads"], "auto")
+        self.assertEqual(settings["staging_keep"], "auto")
+
+    def test_audio_volume_is_clamped_and_upscaler_names_match_runtime(self):
+        app = make_settings_app()
+        app.vars["audio_volume"].set("140")
+        settings = app._collect_settings()
+        self.assertEqual(settings["audio_volume"], "100")
+        self.assertEqual(settings["gpu_device"], "auto")
+        self.assertEqual(launcher.UPSCALER_RUNTIME_NAME,
+                         {"0": "off", "1": "fsr3", "2": "fsr4", "4": "taa"})
+
+    def test_fullscreen_game_restores_the_launcher_window(self):
+        class FakeRoot:
+            def __init__(self):
+                self.calls = []
+
+            def state(self): return "normal"
+            def lower(self): self.calls.append("lower")
+            def deiconify(self): self.calls.append("deiconify")
+            def attributes(self, *args): self.calls.append(("attributes", *args))
+            def lift(self): self.calls.append("lift")
+            def focus_force(self): self.calls.append("focus")
+
+        app = launcher.Launcher.__new__(launcher.Launcher)
+        app.root = FakeRoot()
+        app.app_fullscreen = False
+        app.minimized_for_game = True
+        app._ensure_minimized_for_game()
+        self.assertIn("lower", app.root.calls)
+        app._restore_window_after_game()
+        self.assertFalse(app.minimized_for_game)
+        self.assertIn("deiconify", app.root.calls)
+        self.assertIn("lift", app.root.calls)
+        self.assertNotIn("destroy", app.root.calls)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,4 @@
+tkinterdnd2 0.7.0 — MIT licensed. Vendored for file drag-and-drop support.
+Upstream: https://github.com/Eliav2/tkinterdnd2
+Only Linux x86_64 and Windows x86_64 TkDND runtimes are included.
+See LICENSE for the upstream license.
