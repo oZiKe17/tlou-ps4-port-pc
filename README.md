@@ -54,3 +54,19 @@ nativo mediante MSYS2 CLANG64. El código fuente y sus licencias se distribuyen 
 5. Compilar con `port/build.sh` y iterar.
 
 Ver plan completo: TLOU_PORT_PLAN.md (fuera del repo).
+
+
+## Créditos
+
+Este port se basa en el trabajo de varios proyectos y comunidades:
+
+- **SpartanPort** — [FelipePrado0/SpartanPort](https://github.com/FelipePrado0/SpartanPort): base del port de PS4 a PC, launcher, shadPS4 GPU layer, y herramientas de extracción.
+- **shadPS4** — [shadps4-emu/shadPS4](https://github.com/shadps4-emu/shadPS4): emulador PS4, capa GPU (GNM → Vulkan), shader recompiler.
+- **ps4-pkg-tools** — [xXJSONDeruloXx/ps4-pkg-tools](https://github.com/xXJSONDeruloXx/ps4-pkg-tools): extractor PKG de código abierto (GPL-2.0-or-later), usado para la extracción de paquetes.
+- **tkinterdnd2** — [Eliav2/tkinterdnd2](https://github.com/Eliav2/tkinterdnd2): soporte de arrastrar y soltar en Tkinter (MIT).
+- **LibAtrac9** — decodificador ATRAC9 integrado en el port.
+- **FSR (AMD FidelityFX)** — [GPUOpen-Effects/FidelityFX-FSR](https://github.com/GPUOpen-Effects/FidelityFX-FSR): upscaling FSR 3.1/4.
+- **ps4_core** — núcleo compartido de compatibilidad PS4→host.
+- **Naughty Dog / Sony Interactive Entertainment** — desarrolladores originales de The Last of Us Remastered.
+
+Gracias a la comunidad de porting de PS4 a PC y a todos los contribuidores de los proyectos anteriores.
