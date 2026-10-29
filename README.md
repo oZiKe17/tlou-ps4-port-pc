@@ -1,71 +1,72 @@
 # tlou_pc — The Last of Us Remastered (PS4 → PC/Linux)
 
-Port nativo de *The Last of Us™ Remastered* (CUSA00552, v1.00) para PC/Linux,
-siguiendo el mismo patrón que `tlg_pc` / `gr2_pc` / `iss_pc`:
+Native port of *The Last of Us™ Remastered* (CUSA00552, v1.00) to PC/Linux,
+following the same pattern as `tlg_pc` / `gr2_pc` / `iss_pc`:
 
-NO SE PROPORCIONA NINGUN ARCHIVO O ASSETS DEL JUEGO ORIGINAL
+NO ORIGINAL GAME FILES OR ASSETS ARE PROVIDED
 
-- `ps4_core` como núcleo compartido (compatibilidad PS4→host).
-- `port/scripts/prepare.py` extrae imports del SELF y genera `out/boot.bin` + `out/analysis.json`.
-- `port/scripts/link_modules.py` vincula `libc.prx`/`libSceFios2.prx` → `out/link.json` (imports no resueltos).
-- `port/src/runtime_tlou.c` implementa los imports faltantes (stubs iniciales; refinar por función).
-- Capa GPU: fork shadPS4 (GNM → Vulkan) en `port/gpu/` (sincronizar desde `ps4_core` o `tlg_pc`).
+- `ps4_core` as the shared core (PS4→host compatibility).
+- `port/scripts/prepare.py` extracts imports from the SELF and generates `out/boot.bin` + `out/analysis.json`.
+- `port/scripts/link_modules.py` links `libc.prx`/`libSceFios2.prx` → `out/link.json` (unresolved imports).
+- `port/src/runtime_tlou.c` implements the missing imports (initial stubs; refine per function).
+- GPU layer: shadPS4 fork (GNM → Vulkan) in `port/gpu/` (sync from `ps4_core` or `tlg_pc`).
 
-## Launcher: arrastrar y soltar
+## Launcher: drag and drop
 
-En **Ubicación del juego**, arrastra la carpeta extraída que contiene `eboot.bin` o suelta un archivo `.pkg`.
-Al soltar un PKG, el launcher abre el selector de destino y continúa con el flujo de extracción.
-El soporte TkDND x64 de Linux y Windows está incluido en `launcher/vendor/tkinterdnd2/`.
+In **Game location**, drag the extracted folder containing `eboot.bin` or drop a `.pkg` file.
+When dropping a PKG, the launcher opens the destination picker and continues with the extraction flow.
+Linux and Windows x64 TkDND support is bundled in `launcher/vendor/tkinterdnd2/`.
 
-La extracción PKG usa el CLI GPL-2.0-or-later incluido en
-`launcher/vendor/ps4-pkg-tools/` y `launcher/vendor/pkgtool/bin/`; no requiere .NET ni el motor
-propietario `PkgTool.Core.dll`. Para reconstruir ambos binarios usa
-`launcher/vendor/pkgtool/build-extractors.sh`; en Windows, `Build Windows.bat` construye el CLI
-nativo mediante MSYS2 CLANG64. El código fuente y sus licencias se distribuyen con el port.
+PKG extraction uses the GPL-2.0-or-later CLI bundled in
+`launcher/vendor/ps4-pkg-tools/` and `launcher/vendor/pkgtool/bin/`; it requires no .NET or the
+proprietary `PkgTool.Core.dll` engine. To rebuild both binaries use
+`launcher/vendor/pkgtool/build-extractors.sh`; on Windows, `Build Windows.bat` builds the native
+CLI via MSYS2 CLANG64. Source code and licenses are distributed with the port.
 
-## Estado actual
+## Current status
 
-- Análisis completo: `port/out/analysis.json`, `port/out/link.json`.
-- Cobertura vs ps4_core: 407/526 resueltos (77.4%), 119 faltantes.
-- Stubs generados para los 119 faltantes en `port/src/runtime_tlou.c` (firmas genéricas `int name()`).
-- 38 de los 119 son borrowables desde `runtime_gr2*`/`runtime_infamous*` (marcados en el .c).
-- 75 NIDs sin nombre: resolver con NID DB completa o RE.
+- Full analysis: `port/out/analysis.json`, `port/out/link.json`.
+- Coverage vs ps4_core: 407/526 resolved (77.4%), 119 missing.
+- Stubs generated for the 119 missing in `port/src/runtime_tlou.c` (generic signatures `int name()`).
+- 38 of the 119 are borrowable from `runtime_gr2*`/`runtime_infamous*` (marked in the .c).
+- 75 unnamed NIDs: resolve with full NID DB or RE.
 
-## Estado de pruebas
+## Test status
 
-- Probado solo en Linux (Ubuntu 24.04, Vulkan, PipeWire).
-- Windows: compilación validada con MSYS2 CLANG64 para el runtime y el extractor PKG, pero no se ejecutó en Windows.
-- macOS: no probado ni soportado.
+- Tested only on Linux (Ubuntu 24.04, Vulkan, PipeWire).
+- Windows: build validated with MSYS2 CLANG64 for the runtime and the PKG extractor, but not run on Windows.
+- macOS: not tested or supported.
 
-## Limitaciones conocidas
+## Known limitations
 
-- Requiere una copia legal del juego CUSA00552 (no incluida).
-- Los parches de 60 FPS y resolución para 1.00/1.11 requieren reverse engineering del eboot (no incluidos).
-- FSR 4 requiere GPU con INT8 dot products; fallback a FSR 3.1.
-- Hot pages desactivado por defecto (regresión de FPS observada).
+- Requires a legal copy of the game CUSA00552 (not included).
+- 60 FPS and resolution patches for 1.00/1.11 require reverse engineering of the eboot (not included).
+- FSR 4 requires a GPU with INT8 dot products; falls back to FSR 3.1.
+- Hot pages disabled by default (observed FPS regression).
 
-## FALTAN MUCHAS COSAS POR PULIR 
+## MANY THINGS LEFT TO POLISH
 
-1. Sincronizar `port/gpu/` desde `ps4_core`/`tlg_pc` (submódulos third_party).
-2. Promover a `ps4_core` las funciones borrowables genéricas (jpeg/png/fiber/socket).
-3. Refinar firmas en `runtime_tlou.c` (SDK/RE) y reemplazar stubs por implementaciones.
-4. Resolver los 75 NIDs sin nombre.
-5. Compilar con `port/build.sh` y iterar.
+1. Sync `port/gpu/` from `ps4_core`/`tlg_pc` (third_party submodules).
+2. Promote generic borrowable functions to `ps4_core` (jpeg/png/fiber/socket).
+3. Refine signatures in `runtime_tlou.c` (SDK/RE) and replace stubs with implementations.
+4. Resolve the 75 unnamed NIDs.
+5. Build with `port/build.sh` and iterate.
 
-Ver plan completo: TLOU_PORT_PLAN.md (fuera del repo).
+See full plan: TLOU_PORT_PLAN.md (outside the repo).
 
 
-## Créditos
+## Credits
 
-Este port se basa en el trabajo de varios proyectos y comunidades:
+This port is based on the work of several projects and communities:
 
-- **SpartanPort** — [FelipePrado0/SpartanPort](https://github.com/FelipePrado0/SpartanPort): base del port de PS4 a PC, launcher, shadPS4 GPU layer, y herramientas de extracción.
-- **shadPS4** — [shadps4-emu/shadPS4](https://github.com/shadps4-emu/shadPS4): emulador PS4, capa GPU (GNM → Vulkan), shader recompiler.
-- **ps4-pkg-tools** — [xXJSONDeruloXx/ps4-pkg-tools](https://github.com/xXJSONDeruloXx/ps4-pkg-tools): extractor PKG de código abierto (GPL-2.0-or-later), usado para la extracción de paquetes.
-- **tkinterdnd2** — [Eliav2/tkinterdnd2](https://github.com/Eliav2/tkinterdnd2): soporte de arrastrar y soltar en Tkinter (MIT).
-- **LibAtrac9** — decodificador ATRAC9 integrado en el port.
-- **FSR (AMD FidelityFX)** — [GPUOpen-Effects/FidelityFX-FSR](https://github.com/GPUOpen-Effects/FidelityFX-FSR): upscaling FSR 3.1/4.
-- **ps4_core** — núcleo compartido de compatibilidad PS4→host.
-- **Naughty Dog / Sony Interactive Entertainment** — desarrolladores originales de The Last of Us Remastered.
+- **SpartanPort** — [FelipePrado0/SpartanPort](https://github.com/FelipePrado0/SpartanPort): base of the PS4→PC port, launcher, shadPS4 GPU layer, and extraction tools.
+- **shadPS4** — [shadps4-emu/shadPS4](https://github.com/shadps4-emu/shadPS4): PS4 emulator, GPU layer (GNM → Vulkan), shader recompiler.
+- **ps4-pkg-tools** — [xXJSONDeruloXx/ps4-pkg-tools](https://github.com/xXJSONDeruloXx/ps4-pkg-tools): open-source PKG extractor (GPL-2.0-or-later), used for package extraction.
+- **tkinterdnd2** — [Eliav2/tkinterdnd2](https://github.com/Eliav2/tkinterdnd2): drag-and-drop support in Tkinter (MIT).
+- **LibAtrac9** — ATRAC9 decoder integrated into the port.
+- **FSR (AMD FidelityFX)** — [GPUOpen-Effects/FidelityFX-FSR](https://github.com/GPUOpen-Effects/FidelityFX-FSR): FSR 3.1/4 upscaling.
+- **ps4_core** — shared core for PS4→host compatibility.
+- **Naughty Dog / Sony Interactive Entertainment** — original developers of The Last of Us Remastered.
 
-Gracias a la comunidad de porting de PS4 a PC y a todos los contribuidores de los proyectos anteriores.
+Thanks to the PS4→PC porting community and all contributors of the projects above.
+" path">
