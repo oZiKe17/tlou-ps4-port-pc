@@ -52,7 +52,6 @@ CLI via MSYS2 CLANG64. Source code and licenses are distributed with the port.
 4. Resolve the 75 unnamed NIDs.
 5. Build with `port/build.sh` and iterate.
 
-See full plan: TLOU_PORT_PLAN.md (outside the repo).
 
 
 ## Credits
@@ -64,9 +63,7 @@ This port is based on the work of several projects and communities:
 - **ps4-pkg-tools** — [xXJSONDeruloXx/ps4-pkg-tools](https://github.com/xXJSONDeruloXx/ps4-pkg-tools): open-source PKG extractor (GPL-2.0-or-later), used for package extraction.
 - **tkinterdnd2** — [Eliav2/tkinterdnd2](https://github.com/Eliav2/tkinterdnd2): drag-and-drop support in Tkinter (MIT).
 - **LibAtrac9** — ATRAC9 decoder integrated into the port.
-- **FSR (AMD FidelityFX)** — [GPUOpen-Effects/FidelityFX-FSR](https://github.com/GPUOpen-Effects/FidelityFX-FSR): FSR 3.1/4 upscaling.
 - **ps4_core** — shared core for PS4→host compatibility.
-- **Naughty Dog / Sony Interactive Entertainment** — original developers of The Last of Us Remastered.
+
 
 Thanks to the PS4→PC porting community and all contributors of the projects above.
-" path">
